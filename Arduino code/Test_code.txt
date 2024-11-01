@@ -16,11 +16,12 @@ int enB = 5;  // Motor 2 speed control (optional)
 // Bluetooth module connected to pins 10 (TX of HC-05) and 11 (RX of HC-05)
 SoftwareSerial Bluetooth(10, 11); // RX, TX
 TinyGPSPlus gps;
-SoftwareSerial gpsSerial(2, 3);  // RX, TX for GPS
+SoftwareSerial gpsSerial(5, 6);  // RX, TX for GPS
 QMC5883LCompass compass;
 
 float lastLat = 0, lastLng = 0;
 bool isAutoMode = false;  // Flag for mode selection
+bool disableManualControl = false;
 
 void setup() {
   // Set up the motor pins
@@ -50,21 +51,18 @@ void loop() {
   // Check if any data is received from the Bluetooth app
   if (Bluetooth.available()) {
     char command = Bluetooth.read();  // Read the command sent from the app
-    Serial.println("Received command: ");
+    Serial.print("Received command: ");
     Serial.println(command);          // For debugging
-    if (command == 'A') {
-      isAutoMode = true;
-      Serial.println("Auto mode enabled.");
-    } else if (command == 'M') {
+    if (command == 'M') {
       isAutoMode = false;
       Serial.println("Manual mode enabled.");
-    } else {
-      handleManualControl(command);
+    } else if (command == 'A'){
+        isAutoMode = true;
+        autoModeGPS();  // Switch to GPS-based autonomous mode
+        Serial.println("Auto mode enabled.");
+    } else if (!isAutoMode){
+        handleManualControl(command);
     }
-  }
-
-  if (isAutoMode) {
-    autoModeGPS();  // Switch to GPS-based autonomous mode
   }
 }
 
@@ -99,7 +97,11 @@ void handleManualControl(char command){
 
 // Autonomous GPS mode
 void autoModeGPS() {
+  Serial.println("GPS enabled 1");
+  char c = gpsSerial.read(); // debugging
+  Serial.println(c);
   while (gpsSerial.available() > 0) {
+    Serial.println("GPS enalbed 2");
     char c = gpsSerial.read();
     if (gps.encode(c)) {
       if (gps.location.isUpdated()) {
