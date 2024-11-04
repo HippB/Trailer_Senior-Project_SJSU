@@ -16,7 +16,7 @@ int enB = 5;  // Motor 2 speed control (optional)
 // Bluetooth module connected to pins 10 (TX of HC-05) and 11 (RX of HC-05)
 SoftwareSerial Bluetooth(10, 11); // RX, TX
 TinyGPSPlus gps;
-SoftwareSerial gpsSerial(5, 6);  // RX, TX for GPS
+SoftwareSerial gpsSerial(3, 6);  // RX, TX for GPS
 QMC5883LCompass compass;
 
 float lastLat = 0, lastLng = 0;
@@ -43,6 +43,26 @@ void setup() {
   // Set initial motor speed
   analogWrite(enA, 255); // Speed control for motor 1 (optional)
   analogWrite(enB, 255); // Speed control for motor 2 (optional)
+
+    Serial.println("GPS Test Starting...");
+  
+  // Quick GPS check
+  Serial.println("Checking for GPS data...");
+  unsigned long startTime = millis();
+  bool gpsFound = false;
+  
+  // Wait up to 5 seconds for GPS data
+  while (millis() - startTime < 5000) {
+    if (gpsSerial.available()) {
+      gpsFound = true;
+      Serial.println("GPS data detected!");
+      break;
+    }
+  }
+  
+  if (!gpsFound) {
+    Serial.println("Warning: No GPS data detected in first 5 seconds");
+  }
 
   Serial.println("Setup complete. Waiting for Bluetooth commands...");
 }
@@ -97,11 +117,19 @@ void handleManualControl(char command){
 
 // Autonomous GPS mode
 void autoModeGPS() {
+  nsigned long startTime = millis();
+  const unsigned long TIMEOUT = 1000; // 1 second timeout
+
   Serial.println("GPS enabled 1");
   char c = gpsSerial.read(); // debugging
   Serial.println(c);
   while (gpsSerial.available() > 0) {
     Serial.println("GPS enalbed 2");
+    if (millis() - startTime > TIMEOUT) {
+      Serial.println("GPS read timeout");
+      return;
+    }
+    
     char c = gpsSerial.read();
     if (gps.encode(c)) {
       if (gps.location.isUpdated()) {
@@ -124,6 +152,7 @@ void autoModeGPS() {
       }
     }
   }
+  delay(10);
 }
 
 // Function to calculate the bearing between two coordinates
