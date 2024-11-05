@@ -1,0 +1,47 @@
+#include <NMEAGPS.h>
+#include <SoftwareSerial.h>
+
+SoftwareSerial gpsSerial(3, 6); // RX, TX
+NMEAGPS gps;
+gps_fix fix;
+
+void setup() {
+  Serial.begin(9600);
+  gpsSerial.begin(9600);
+  
+  Serial.println("NEO-6M GPS Test with NeoGPS library");
+  Serial.println("Waiting for GPS data...");
+}
+
+void loop() {
+  while (gpsSerial.available()) {
+    if (gps.decode(gpsSerial.read()) == NMEAGPS::DECODE_COMPLETED) {
+      fix = gps.fix();
+      
+      Serial.println("\n--- GPS Fix ---");
+      if (fix.valid.location) {
+        Serial.print("Location: ");
+        Serial.print(fix.latitude(), 6);
+        Serial.print(", ");
+        Serial.println(fix.longitude(), 6);
+      } else {
+        Serial.println("Location not valid");
+      }
+      
+      if (fix.valid.altitude) {
+        Serial.print("Altitude: ");
+        Serial.println(fix.altitude());
+      }
+      
+      if (fix.valid.speed) {
+        Serial.print("Speed (knots): ");
+        Serial.println(fix.speed());
+      }
+      
+      if (fix.valid.satellites) {
+        Serial.print("Satellites: ");
+        Serial.println(fix.satellites);
+      }
+    }
+  }
+}
