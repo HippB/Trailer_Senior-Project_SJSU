@@ -117,7 +117,7 @@ void handleManualControl(char command){
 
 // Autonomous GPS mode
 void autoModeGPS() {
-  nsigned long startTime = millis();
+  unsigned long startTime = millis();
   const unsigned long TIMEOUT = 1000; // 1 second timeout
 
   Serial.println("GPS enabled 1");
