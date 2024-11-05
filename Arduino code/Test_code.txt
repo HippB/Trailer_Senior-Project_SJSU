@@ -16,12 +16,11 @@ int enB = 5;  // Motor 2 speed control (optional)
 // Bluetooth module connected to pins 10 (TX of HC-05) and 11 (RX of HC-05)
 SoftwareSerial Bluetooth(10, 11); // RX, TX
 TinyGPSPlus gps;
-SoftwareSerial gpsSerial(3, 6);  // RX, TX for GPS
+SoftwareSerial gpsSerial(6, 3);  // RX, TX for GPS
 QMC5883LCompass compass;
 
 float lastLat = 0, lastLng = 0;
 bool isAutoMode = false;  // Flag for mode selection
-bool disableManualControl = false;
 
 void setup() {
   // Set up the motor pins
