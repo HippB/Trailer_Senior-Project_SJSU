@@ -16,13 +16,24 @@ int enB = 5;  // Motor 2 speed control (optional)
 // Bluetooth module connected to pins 10 (TX of HC-05) and 11 (RX of HC-05)
 SoftwareSerial Bluetooth(10, 11); // RX, TX
 TinyGPSPlus gps;
-SoftwareSerial gpsSerial(6, 3);  // RX, TX for GPS
+SoftwareSerial gpsSerial(3, 6);  // RX, TX for GPS
 QMC5883LCompass compass;
 
 float lastLat = 0, lastLng = 0;
-bool isAutoMode = false;  // Flag for mode selection
+bool autoMode = false;  // Flag for mode selection
+volatile bool flag = 0;
+char command;
 
 void setup() {
+  // Start Bluetooth communication
+  Bluetooth.begin(9600); // Set baud rate of Bluetooth module
+  Serial.begin(9600);    // For debugging
+  gpsSerial.begin(9600);  // GPS module setup
+  delay(100);
+
+  Wire.begin();
+  compass.init(); // Initialize compass  
+
   // Set up the motor pins
   pinMode(motor1pin1, OUTPUT);
   pinMode(motor1pin2, OUTPUT);
@@ -32,13 +43,6 @@ void setup() {
   pinMode(enA, OUTPUT); // (Optional) Motor speed control
   pinMode(enB, OUTPUT); // (Optional) Motor speed control
   
-  // Start Bluetooth communication
-  Bluetooth.begin(9600); // Set baud rate of Bluetooth module
-  Serial.begin(9600);    // For debugging
-  gpsSerial.begin(9600);  // GPS module setup
-  Wire.begin();
-  compass.init(); // Initialize compass
-
   // Set initial motor speed
   analogWrite(enA, 255); // Speed control for motor 1 (optional)
   analogWrite(enB, 255); // Speed control for motor 2 (optional)
@@ -67,91 +71,106 @@ void setup() {
 }
 
 void loop() {
-  // Check if any data is received from the Bluetooth app
-  if (Bluetooth.available()) {
-    char command = Bluetooth.read();  // Read the command sent from the app
-    Serial.print("Received command: ");
-    Serial.println(command);          // For debugging
-    if (command == 'M') {
-      isAutoMode = false;
-      Serial.println("Manual mode enabled.");
-    } else if (command == 'A'){
-        isAutoMode = true;
-        autoModeGPS();  // Switch to GPS-based autonomous mode
+  Serial.print("Enter command: ");
+  if (Serial.available() > 0){
+    command = Serial.read();
+    Serial.println(command);
+    
+    if (command == 'A'){
+        autoMode = true;
+        flag = 1;
+        GPSautoMode();  // Switch to GPS-based autonomous mode
         Serial.println("Auto mode enabled.");
-    } else if (!isAutoMode){
+    } else if (command == 'M') {
+        autoMode = false;
+        flag = 1;
+        Serial.println("Manual mode enabled.");
+    } else if (!autoMode){
         handleManualControl(command);
+    } else if (command == 'O'){
+      reset();
     }
   }
+}
+
+/* Stopping DC motors and bringing servo motor to original position */
+void reset() {
+    stopMotors();
+    flag = 0;
+    Serial.println("Resetting...");
 }
 
 // Command interpretation for motor control
 void handleManualControl(char command){
-  switch (command) {
-    case 'F': // Forward
-      Serial.println("Moving forward");
-      moveForward();
-      break;
-    case 'B': // Backward
-      Serial.println("Moving backward");
-      moveBackward();
-      break;
-    case 'L': // Left
-      Serial.println("Turning left");
-      turnLeft();
-      break;
-    case 'R': // Right
-      Serial.println("Turning right");
-      turnRight();
-      break;
-    case 'S': // Stop
-      Serial.println("Stopping motors");
-      stopMotors();
-      break;
-    default:
-      Serial.println("Unrecognized command");
-      break;
+  if (flag == 1){
+    switch (command) {
+      case 'F': // Forward
+        Serial.println("Moving forward");
+        moveForward();
+        break;
+      case 'B': // Backward
+        Serial.println("Moving backward");
+        moveBackward();
+        break;
+      case 'L': // Left
+        Serial.println("Turning left");
+        turnLeft();
+        break;
+      case 'R': // Right
+        Serial.println("Turning right");
+        turnRight();
+        break;
+      case 'S': // Stop
+        Serial.println("Stopping motors");
+        stopMotors();
+        break;
+      default:
+        Serial.println("Unrecognized command");
+        break;
+    }
   }
 }
 
 // Autonomous GPS mode
-void autoModeGPS() {
-  unsigned long startTime = millis();
-  const unsigned long TIMEOUT = 1000; // 1 second timeout
+void GPSautoMode() {
+  if (flag == 1){
+    unsigned long startTime = millis();
+    const unsigned long TIMEOUT = 1000; // 1 second timeout
 
-  Serial.println("GPS enabled 1");
-  char c = gpsSerial.read(); // debugging
-  Serial.println(c);
-  while (gpsSerial.available() > 0) {
-    Serial.println("GPS enalbed 2");
-    if (millis() - startTime > TIMEOUT) {
-      Serial.println("GPS read timeout");
-      return;
-    }
-    
-    char c = gpsSerial.read();
-    if (gps.encode(c)) {
-      if (gps.location.isUpdated()) {
-        float lat = gps.location.lat();
-        float lng = gps.location.lng();
+    Serial.println("GPS enabled 1");
+    char c = gpsSerial.read(); // debugging
+    Serial.println(c);
+    while (gpsSerial.available() > 0) {
+      Serial.println("GPS enalbed 2");
+      if (millis() - startTime > TIMEOUT) {
+        Serial.println("GPS read timeout");
+        return;
+      }
+      
+      char c = gpsSerial.read();
+      if (gps.encode(c)) {
+        if (gps.location.isUpdated()) {
+          float lat = gps.location.lat();
+          float lng = gps.location.lng();
 
-        float angleToTarget = calculateBearing(lastLat, lastLng, lat, lng);
-        float distance = calculateDistance(lastLat, lastLng, lat, lng);
+          float angleToTarget = calculateBearing(lastLat, lastLng, lat, lng);
+          float distance = calculateDistance(lastLat, lastLng, lat, lng);
 
-        if (distance > 5.0) {  // If target is more than 5 meters away
-          moveTowards(angleToTarget);  // Move towards the target
-        } else {
-          Serial.println("Reached target.");
-          stopMotors();  // Stop when close to target
+          if (distance > 5.0) {  // If target is more than 5 meters away
+            moveTowards(angleToTarget);  // Move towards the target
+          } else {
+            Serial.println("Reached target.");
+            stopMotors();  // Stop when close to target
+          }
+
+          // Update last known position
+          lastLat = lat;
+          lastLng = lng;
         }
-
-        // Update last known position
-        lastLat = lat;
-        lastLng = lng;
       }
     }
+    delay(10);
   }
-  delay(10);
 }
 
 // Function to calculate the bearing between two coordinates
