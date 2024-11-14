@@ -26,8 +26,8 @@ char command;
 
 void setup() {
   // Start Bluetooth communication
-  Bluetooth.begin(9600); // Set baud rate of Bluetooth module
   Serial.begin(9600);    // For debugging
+  Bluetooth.begin(9600); // Set baud rate of Bluetooth module
   gpsSerial.begin(9600);  // GPS module setup
   delay(100);
 
@@ -47,7 +47,7 @@ void setup() {
   analogWrite(enA, 255); // Speed control for motor 1 (optional)
   analogWrite(enB, 255); // Speed control for motor 2 (optional)
 
-    Serial.println("GPS Test Starting...");
+  Serial.println("GPS Test Starting...");
   
   // Quick GPS check
   Serial.println("Checking for GPS data...");
@@ -56,7 +56,7 @@ void setup() {
   
   // Wait up to 5 seconds for GPS data
   while (millis() - startTime < 5000) {
-    if (gpsSerial.available()) {
+    if (gpsSerial.available() > 0) {
       gpsFound = true;
       Serial.println("GPS data detected!");
       break;
@@ -71,24 +71,32 @@ void setup() {
 }
 
 void loop() {
-  Serial.print("Enter command: ");
-  if (Serial.available() > 0){
-    command = Serial.read();
-    Serial.println(command);
+  // Check for incoming Bluetooth commands
+  if (Bluetooth.available() > 0) {
+    command = Bluetooth.read();  // Use Bluetooth.read() to get commands from the app
+    Serial.println(command);  // Debugging output
     
     if (command == 'A'){
         autoMode = true;
         flag = 1;
-        GPSautoMode();  // Switch to GPS-based autonomous mode
+        gpsSerial.listen();
+        delay(100);
         Serial.println("Auto mode enabled.");
     } else if (command == 'M') {
         autoMode = false;
         flag = 1;
+        //gpsSerial.end();
+        Bluetooth.listen();
+        delay(100);
         Serial.println("Manual mode enabled.");
-    } else if (!autoMode){
-        handleManualControl(command);
     } else if (command == 'O'){
       reset();
+    }
+
+    if (autoMode){
+      GPSautoMode();  // Switch to GPS-based autonomous mode
+    } else {
+      handleManualControl(command);
     }
   }
 }
@@ -133,43 +141,46 @@ void handleManualControl(char command){
 
 // Autonomous GPS mode
 void GPSautoMode() {
+  unsigned long startTime = millis();
+  const unsigned long TIMEOUT = 1000; // 1 second timeout
+  // char c = gpsSerial.read(); // debugging
+  // Serial.println(c);
+  // Check if GPS data is available
   if (flag == 1){
-    unsigned long startTime = millis();
-    const unsigned long TIMEOUT = 1000; // 1 second timeout
+    if (gpsSerial.available() > 0) {
+      Serial.println("Reading GPS data...");
 
-    Serial.println("GPS enabled 1");
-    char c = gpsSerial.read(); // debugging
-    Serial.println(c);
-    while (gpsSerial.available() > 0) {
-      Serial.println("GPS enalbed 2");
-      if (millis() - startTime > TIMEOUT) {
-        Serial.println("GPS read timeout");
-        return;
-      }
-      
-      char c = gpsSerial.read();
-      if (gps.encode(c)) {
-        if (gps.location.isUpdated()) {
-          float lat = gps.location.lat();
-          float lng = gps.location.lng();
+      while (millis() - startTime < TIMEOUT) {
+        char c = gpsSerial.read();
+        
+        if (gps.encode(c)) {
+          if (gps.location.isUpdated()) {
+            float lat = gps.location.lat();
+            float lng = gps.location.lng();
 
-          float angleToTarget = calculateBearing(lastLat, lastLng, lat, lng);
-          float distance = calculateDistance(lastLat, lastLng, lat, lng);
+            // Calculate direction and distance
+            float angleToTarget = calculateBearing(lastLat, lastLng, lat, lng);
+            float distance = calculateDistance(lastLat, lastLng, lat, lng);
 
-          if (distance > 5.0) {  // If target is more than 5 meters away
-            moveTowards(angleToTarget);  // Move towards the target
-          } else {
-            Serial.println("Reached target.");
-            stopMotors();  // Stop when close to target
+            if (distance > 5.0) {  // If target is more than 5 meters away
+              moveTowards(angleToTarget);  // Move towards the target
+            } else {
+              Serial.println("Reached target.");
+              stopMotors();  // Stop when close to target
+            }
+
+            // Update last known position
+            lastLat = lat;
+            lastLng = lng;
+            return;  // Exit function after processing current GPS data
           }
-
-          // Update last known position
-          lastLat = lat;
-          lastLng = lng;
         }
       }
+
+      Serial.println("GPS read timeout");  // Timeout if no new data within limit
+    } else {
+      Serial.println("No GPS data available.");
     }
-    delay(10);
   }
 }
 
