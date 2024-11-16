@@ -8,7 +8,6 @@ QMC5883LCompass compass;
 
 float lastLat = 0, lastLng = 0;
 bool autoMode = false;
-char command;
 
 // Pin configuration for motors
 const int motor1pin1 = 7;
