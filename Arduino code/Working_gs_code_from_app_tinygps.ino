@@ -1,5 +1,5 @@
 #include <SoftwareSerial.h>
-#include <TinyGPSPlus.h>
+#include <TinyGPS++.h>
 
 // Set up Bluetooth Serial
 SoftwareSerial btSerial(6, 7);  // RX, TX for Bluetooth module
@@ -63,5 +63,5 @@ void displayGPSData() {
   }
 
   Serial.println(); // Print a blank line for readability
-  delay(5000);      // Slow down output for readability
+  delay(1000);      // Slow down output for readability
 }
