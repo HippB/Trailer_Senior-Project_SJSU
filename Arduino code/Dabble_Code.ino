@@ -1,28 +1,52 @@
+#include <ArduinoBLE.h>
 #include <Dabble.h>
 #include <TinyGPSPlus.h>
 #include <QMC5883LCompass.h>
+#include <Wire.h>
 
-// GPS module and compass setup
+// BLE Service and Characteristics
+BLEService robotService("180A"); // Custom BLE Service
+BLECharacteristic commandChar("2A56", BLEWrite | BLEWriteWithoutResponse, 1); // Command Characteristic
+BLECharacteristic gpsChar("2A58", BLERead, 20); // GPS Data Characteristic
+
+// Motor Control Pins
+#define motor1pin1 7
+#define motor1pin2 8
+#define motor2pin1 12
+#define motor2pin2 4
+#define enA 9
+#define enB 10
+
+// Global variables
+bool autoMode = false;
+char command;
 TinyGPSPlus gps;
 QMC5883LCompass compass;
 
 float lastLat = 0, lastLng = 0;
-bool autoMode = false;
 
-// Pin configuration for motors
-const int motor1pin1 = 7;
-const int motor1pin2 = 8;
-const int motor2pin1 = 12;
-const int motor2pin2 = 4;
-const int enA = 9;
-const int enB = 10;
-
+// Setup function
 void setup() {
   Serial.begin(9600);
-  Dabble.begin(9600);  // Initializes Dabble with Bluetooth
-  delay(100);
+  while (!Serial); // Wait for Serial Monitor to connect
 
-  // Motor setup
+  // Initialize BLE
+  if (!BLE.begin()) {
+    Serial.println("Failed to initialize BLE!");
+    while (1);
+  }
+
+  BLE.setLocalName("ArduinoR4Robot");
+  BLE.setAdvertisedService(robotService);
+  robotService.addCharacteristic(commandChar);
+  robotService.addCharacteristic(gpsChar);
+  BLE.addService(robotService);
+  BLE.advertise();
+
+  // Initialize Dabble
+  Dabble.begin(9600);
+
+  // Initialize Motor Pins
   pinMode(motor1pin1, OUTPUT);
   pinMode(motor1pin2, OUTPUT);
   pinMode(motor2pin1, OUTPUT);
@@ -30,67 +54,98 @@ void setup() {
   pinMode(enA, OUTPUT);
   pinMode(enB, OUTPUT);
 
-  // Set initial motor speed
-  analogWrite(enA, 255); 
-  analogWrite(enB, 255); 
+  analogWrite(enA, 255); // Set full speed
+  analogWrite(enB, 255); // Set full speed
 
   Wire.begin();
-  compass.init();  // Initialize the compass
+  compass.init();
 
-  Serial.println("Setup complete. Waiting for Bluetooth commands...");
+  Serial.println("Setup complete. Waiting for commands...");
 }
 
 void loop() {
-  // Read GPS data
-  while (Serial.available()) {
-    gps.encode(Serial.read());
+  // Process BLE communication
+  BLEDevice central = BLE.central();
+  if (central) {
+    while (central.connected()) {
+      processBLECommands();
+    }
   }
 
-  // Send GPS data to Serial Monitor
-  printGPSData();
-
-  Dabble.processInput();  // Processes incoming data from Dabble app
-
-  // Check if Gamepad module is connected
+  // Process Dabble commands
+  Dabble.processInput();
   if (GamePad.isConnected()) {
     handleGamePadControls();
   }
 
-  // Switch between auto and manual modes based on command
+  // Execute GPS autonomous mode if enabled
   if (autoMode) {
     GPSautoMode();
   }
 }
 
+/*
+// Process BLE commands
+void processBLECommands() {
+  if (commandChar.written()) {
+    uint8_t receivedCommand;
+    commandChar.readValue(receivedCommand);
+    command = (char)receivedCommand;
+
+    Serial.print("BLE Command received: ");
+    Serial.println(command);
+
+    if (command == 'A') {
+      autoMode = true;
+      Serial.println("Switched to Auto Mode");
+    } else if (command == 'M') {
+      autoMode = false;
+      Serial.println("Switched to Manual Mode");
+    } else if (autoMode) {
+      // Process autonomous mode BLE commands (if any additional logic needed)
+    } else {
+      handleManualControl(command);
+    }
+  }
+
+  if (autoMode) {
+    String gpsData = "GPS,12.3456,78.9101"; // Mock GPS data
+    gpsChar.writeValue(gpsData.c_str());
+    Serial.println("Sent GPS data: " + gpsData);
+    GPSautoMode();
+  }
+}
+*/
+
+// Handle GamePad controls from Dabble
 void handleGamePadControls() {
   if (GamePad.isUpPressed()) {
-    Serial.println("Moving forward");	
     moveForward();
+    Serial.println("Forward.");
   } else if (GamePad.isDownPressed()) {
-    Serial.println("Moving backward");
     moveBackward();
+    Serial.println("Down.");
   } else if (GamePad.isLeftPressed()) {
-    Serial.println("Turning left");
     turnLeft();
+    Serial.println("Left.");
   } else if (GamePad.isRightPressed()) {
-    Serial.println("Turning right");
     turnRight();
+    Serial.println("Right.");
   } else {
     stopMotors();
   }
 
-  if (GamePad.isSquarePressed()) {  // Square button for Auto Mode
+  if (GamePad.isSquarePressed()) { // Square button for Auto Mode
     autoMode = true;
     Serial.println("Auto mode enabled.");
-  } else if (GamePad.isCirclePressed()) {  // Circle button for Manual Mode
+  } else if (GamePad.isCirclePressed()) { // Circle button for Manual Mode
     autoMode = false;
     Serial.println("Manual mode enabled.");
   }
 }
 
-// Autonomous GPS navigation
+// GPS-based autonomous navigation
 void GPSautoMode() {
-  // Implement your GPS-based autonomous mode here
   if (gps.location.isUpdated()) {
     float lat = gps.location.lat();
     float lng = gps.location.lng();
@@ -105,24 +160,13 @@ void GPSautoMode() {
       stopMotors();
     }
 
+    // update arduino GPS data
     lastLat = lat;
     lastLng = lng;
   }
 }
 
-void printGPSData() {
-  if (GamePad.isSquarePressed()) {
-    Serial.println(" ");
-    Serial.println("PIN LOCATION ---> ");
-    Serial.print("Latitude: ");
-    Serial.println(gps.location.lat(), 6);
-    Serial.print("Longitude: ");
-    Serial.println(gps.location.lng(), 6);
-    delay(1000);
-  } 
-}
-
-// Movement functions
+// Motor control functions
 void moveForward() {
   digitalWrite(motor1pin1, HIGH);
   digitalWrite(motor1pin2, LOW);
@@ -158,16 +202,16 @@ void stopMotors() {
   digitalWrite(motor2pin2, LOW);
 }
 
-// Function to calculate the bearing between two coordinates
+// Bearing and distance calculations
 float calculateBearing(float lat1, float lng1, float lat2, float lng2) {
+  // Implement bearing calculation
   float y = sin(lng2 - lng1) * cos(lat2);
   float x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(lng2 - lng1);
-  float brng = atan2(y, x);
-  return degrees(brng);  // Convert radians to degrees
+  return degrees(atan2(y, x));  // Convert radians to degrees
 }
 
-// Function to calculate the distance between two coordinates (Haversine formula)
 float calculateDistance(float lat1, float lng1, float lat2, float lng2) {
+  // Implement distance calculation
   const float R = 6371e3;  // Earth radius in meters
   float phi1 = radians(lat1);
   float phi2 = radians(lat2);
@@ -178,13 +222,11 @@ float calculateDistance(float lat1, float lng1, float lat2, float lng2) {
             cos(phi1) * cos(phi2) *
             sin(deltaLambda / 2) * sin(deltaLambda / 2);
   float c = 2 * atan2(sqrt(a), sqrt(1 - a));
-
-  float distance = R * c;
-  return distance;  // Distance in meters
+  return R * c;  // Distance in meters
 }
 
-// Move towards target direction based on the angle
 void moveTowards(float targetAngle) {
+  // Implement movement logic towards a target angle
   compass.read();
   int x = compass.getX();
   int y = compass.getY();
@@ -193,7 +235,6 @@ void moveTowards(float targetAngle) {
   if (currentHeading < 0) currentHeading += 360;
 
   float angleDifference = targetAngle - currentHeading;
-
   if (angleDifference > 0) {
     turnRight();
   } else {
@@ -204,5 +245,5 @@ void moveTowards(float targetAngle) {
   Serial.println(currentHeading);
   Serial.print("Target Angle: ");
   Serial.println(targetAngle);
-  delay(500);  // Read every half second
+  delay(500);  // Delay for stabilization
 }
