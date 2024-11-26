@@ -1,0 +1,128 @@
+#include <SoftwareSerial.h>
+
+// Bluetooth setup
+SoftwareSerial Bluetooth(11, 10); // RX (to TX of Bluetooth), TX (to RX of Bluetooth)
+
+// Motor Control Pins
+int motor1pin1 = 7;
+int motor1pin2 = 8;
+int motor2pin1 = 12;
+int motor2pin2 = 4;
+
+int enA = 9;  // Motor 1 speed control (optional)
+int enB = 5;  // Motor 2 speed control (optional)
+
+void setup() {
+  // Initialize Serial and Bluetooth communication
+  Serial.begin(9600);
+  Bluetooth.begin(9600);
+
+  // Motor setup
+  pinMode(motor1pin1, OUTPUT);
+  pinMode(motor1pin2, OUTPUT);
+  pinMode(motor2pin1, OUTPUT);
+  pinMode(motor2pin2, OUTPUT);
+  pinMode(enA, OUTPUT);
+  pinMode(enB, OUTPUT);
+
+  Serial.println("System Initialized. Waiting for GPS data...");
+}
+
+void loop() {
+  // Read and process data from Bluetooth
+  if (Bluetooth.available()) {
+    String data = Bluetooth.readStringUntil('\n'); // Read data until a newline character
+    Serial.print("Received: ");
+    Serial.println(data);
+
+    if (data.startsWith("GPS")) { // Check if data starts with "GPS"
+      processGPSData(data);
+    } else {
+      handleMotorCommand(data[0]); // Handle single-character motor commands
+    }
+  }
+}
+
+// Function to process GPS data
+void processGPSData(String data) {
+  int firstComma = data.indexOf(',');  // Find the first comma
+  int secondComma = data.indexOf(',', firstComma + 1); // Find the second comma
+
+  if (firstComma > 0 && secondComma > 0) {
+    String latitude = data.substring(firstComma + 1, secondComma); // Extract latitude
+    String longitude = data.substring(secondComma + 1);           // Extract longitude
+
+    // Display GPS data on Serial Monitor
+    Serial.println("Parsed GPS Data:");
+    Serial.print("Latitude: ");
+    Serial.println(latitude);
+    Serial.print("Longitude: ");
+    Serial.println(longitude);
+  } else {
+    Serial.println("Invalid GPS data format.");
+  }
+}
+
+// Function to handle motor commands
+void handleMotorCommand(char command) {
+  switch (command) {
+    case 'F': // Move forward
+      moveForward();
+      break;
+    case 'B': // Move backward
+      moveBackward();
+      break;
+    case 'L': // Turn left
+      turnLeft();
+      break;
+    case 'R': // Turn right
+      turnRight();
+      break;
+    case 'S': // Stop motors
+      stopMotors();
+      break;
+    default:
+      Serial.println("Unknown command.");
+  }
+}
+
+// Motor control functions
+void moveForward() {
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, HIGH);
+  digitalWrite(motor2pin1, HIGH);
+  digitalWrite(motor2pin2, LOW);
+  Serial.println("Moving Forward");
+}
+
+void moveBackward() {
+  digitalWrite(motor1pin1, HIGH);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, HIGH);
+  Serial.println("Moving Backward");
+}
+
+void turnLeft() {
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, HIGH);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, HIGH);
+  Serial.println("Turning Left");
+}
+
+void turnRight() {
+  digitalWrite(motor1pin1, HIGH);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, HIGH);
+  digitalWrite(motor2pin2, LOW);
+  Serial.println("Turning Right");
+}
+
+void stopMotors() {
+  digitalWrite(motor1pin1, LOW);
+  digitalWrite(motor1pin2, LOW);
+  digitalWrite(motor2pin1, LOW);
+  digitalWrite(motor2pin2, LOW);
+  Serial.println("Stopping Motors");
+}
