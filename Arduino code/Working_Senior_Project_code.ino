@@ -1,16 +1,16 @@
 #include <SoftwareSerial.h>
 
 int motor1pin1 = 7;
-int motor1pin2 = 8;
+int motor1pin2 = 10;
 
 int motor2pin1 = 12;
 int motor2pin2 = 4;
 
-int enA = 9;  // Motor 1 speed control (optional)
+int enA = 11;  // Motor 1 speed control (optional)
 int enB = 5;  // Motor 2 speed control (optional)
 
 // Bluetooth module connected to pins 10 (TX of HC-05) and 11 (RX of HC-05)
-SoftwareSerial Bluetooth(10, 11); // RX, TX
+SoftwareSerial Bluetooth(8, 9); // RX, TX
 
 void setup() {
   // Set up the motor pins
