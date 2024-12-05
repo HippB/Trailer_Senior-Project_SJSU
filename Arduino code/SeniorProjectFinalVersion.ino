@@ -36,8 +36,8 @@ void setup() {
   pinMode(motor2pin2, OUTPUT);
   pinMode(enA, OUTPUT);
   pinMode(enB, OUTPUT);
-  analogWrite(enA, 255);
-  analogWrite(enB, 255);
+  analogWrite(enA, 175);
+  analogWrite(enB, 215);
 
   // Compass setup
   Wire.begin();
