@@ -41,9 +41,8 @@ void setup() {
 
   // Compass setup
   Wire.begin();
-  compass.init();
-  compass.setCalibration(-1000, 1000, -1000, 1000, -1000, 1000);
-
+  compass.init(); // Initialize compass
+  compass.setMagneticDeclination(12.89, 0.36); // Adjust for your location (example: Londrina, Brazil)
   Serial.println("System Initialized. Waiting for Bluetooth commands...");
 }
 
@@ -53,6 +52,7 @@ void loop() {
     String data = Bluetooth.readStringUntil('\n');
     Serial.print("Received: ");
     Serial.println(data);
+
     if (data.startsWith("GPS")) {
       processGPSData(data);
     }
@@ -77,13 +77,13 @@ void processGPSData(String data) {
     float receivedLatitude = latitudeStr.toFloat();
     float receivedLongitude = longitudeStr.toFloat();
 
-    // Format and print the received coordinates
+    // Print parsed coordinates
     Serial.print("Parsed Latitude: ");
     Serial.println(receivedLatitude, 6);
     Serial.print("Parsed Longitude: ");
     Serial.println(receivedLongitude, 6);
 
-    // Update current or target coordinates based on gpsUpdateCounter
+    // Alternate between updating current and target coordinates
     if (gpsUpdateCounter % 2 == 0) {
       currentLatitude = receivedLatitude;
       currentLongitude = receivedLongitude;
@@ -107,28 +107,44 @@ void navigateToTarget() {
   Serial.print(distanceCm);
   Serial.println(" cm");
 
-  if (distanceCm > 50) { // 50 cm threshold (0.5 meters)
-    int heading = getCompassHeading();
-    float angleDifference = targetBearing - heading;
+  int heading = getCompassHeading();
 
-    if (angleDifference > 180) angleDifference -= 360;
-    if (angleDifference < -180) angleDifference += 360;
+  Serial.print("Target Bearing: ");
+  Serial.println(targetBearing);
+  Serial.print("Current Heading: ");
+  Serial.println(heading);
 
-    Serial.print("Angle Difference: ");
-    Serial.println(angleDifference);
+  // Calculate the angle difference between the heading and target bearing
+  float angleDifference = targetBearing - heading;
 
+  // Normalize the angle difference to -180° to 180°
+  if (angleDifference > 180) {
+    angleDifference -= 360;
+  }
+  if (angleDifference < -180) {
+    angleDifference += 360;
+  }
+
+  Serial.print("Angle Difference: ");
+  Serial.println(angleDifference);
+
+  if (distanceCm > 50) { // Threshold: 50 cm
     if (angleDifference > 5) {
       turnRight();
+      Serial.println("Turning Right...");
     } else if (angleDifference < -5) {
       turnLeft();
+      Serial.println("Turning Left...");
     } else {
       moveForward();
+      Serial.println("Moving Forward...");
     }
   } else {
     stopMotors();
     Serial.println("Target reached. Awaiting new coordinates...");
   }
 }
+
 
 float calculateDistance(float lat1, float lon1, float lat2, float lon2) {
   const float R = 6371e3; // Earth's radius in meters
@@ -155,10 +171,19 @@ float calculateBearing(float lat1, float lon1, float lat2, float lon2) {
   return fmod((degrees(atan2(y, x)) + 360.0), 360.0); // Normalize to 0-360 degrees
 }
 
+
 int getCompassHeading() {
-  compass.read();
-  return compass.getAzimuth();
+  compass.read(); // Update compass readings
+  int azimuth = compass.getAzimuth(); // Get azimuth (heading) in degrees
+
+  // Normalize to 0-360° range
+  if (azimuth < 0) {
+    azimuth += 180;
+  }
+
+  return azimuth;
 }
+
 
 // Motor control functions
 void moveForward() {
