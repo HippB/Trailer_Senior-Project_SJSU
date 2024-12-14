@@ -17,6 +17,12 @@ Navigate to the MIT app folder on the Github Repository. Select the car_control.
 Device Code:
 Connect your Trail-er device to a computer that has the Arduino IDE application installed. In the repository, select the Arduino code you would like to upload to the device. SeniorProjectFinalVersion.ino will be the program to upload for semi-automatic control. ManualControl.ino, will be the manual control program for the Trail-er. After deciding a version, compile and upload the code to the device, and after reconnecting the device to the battery pack and reseting the Arduino Uno board on the device, it is now ready for operation.
 
+Operating in Manual Mode:
+After uploading the ManualControl.ino, the device will be available for manual control, the 4 movement buttons, forwards(up), backwards(down), left turn, and right turn, will allow the user to move the device in their respective directions. If an unforseen error occurs and the motors do not stop upon letting go of the button, the bottom right most reset button will halt the device.
+
+Operating in Semi-Automatic Mode:
+Turn on the device and stand next to the device, press the "o" button on the application and send the starting location of the Trail-er, it will spin and upon pressing the button again the device will stop. Now the user may relocate to a different location, and when you are ready to call for the device, click the "o" button again to send the targetted location to the Trail-er and the device will automatically drive to the given location. After completing the movement, the user may relocate once more and repeat the process.
+
 
 APPROVED FOR THE COLLEGE OF ENGINEERING
 
